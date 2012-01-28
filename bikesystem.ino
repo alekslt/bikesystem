@@ -9,7 +9,7 @@
 #include <string.h>
 
 // Defines
-#define MAX_STRING_LEN  20
+#define MAX_STRING_LEN  128
 
 #define DHTPIN 2     // what pin we're connected to
 
@@ -26,10 +26,10 @@ DHT dht(DHTPIN, DHT11);
 
 SoftwareSerial blueToothSerial(RxD,TxD);
 
-struct Serial_info sensors[10];
+struct Serial_info *sensors[10];
 uint8_t sensor_amount = 0;
 
-struct Command commands[10];
+struct Command *commands[10];
 uint8_t command_amount = 0;
 
 char cmd_buf[128];
@@ -82,16 +82,11 @@ void DHT_get_humidity(uint8_t id, Stream &ser)
 
 void config_get()
 {
-  strcpy(sensors[sensor_amount].key, "DHT_H");
-  strcpy(sensors[sensor_amount].description, "DHT Humidity");
-  sensors[sensor_amount].fn = DHT_get_humidity;
-
+	sensors[sensor_amount] = new Serial_info("DHT_H", "DHT Humidity", DHT_get_humidity);
   sensor_amount++;
 
-  strcpy(sensors[sensor_amount].key, "DHT_T");
-  strcpy(sensors[sensor_amount].description, "DHT Temp");
-  sensors[sensor_amount].fn = DHT_get_temp;
-
+	sensors[sensor_amount] = new Serial_info("DHT_T", "DHT Temp", DHT_get_temp);
+  sensor_amount++;
 }
 
 void cmd_send_config(uint8_t id, char* args, Stream &ser);
@@ -105,60 +100,38 @@ void cmd_bt_work(uint8_t id, char* args, Stream &ser);
 
 void config_cmd()
 {
-  strcpy(commands[command_amount].cmd, "CONFIG");
-  strcpy(commands[command_amount].description, "Send Config");
-  commands[command_amount].argn = 0;
-  commands[command_amount].fn = cmd_send_config;
-
+	
+	commands[command_amount] = new Command("CONFIG", "Send Config", 0, cmd_send_config);
   command_amount++;
 
-  strcpy(commands[command_amount].cmd, "+BTSTATE");
-  strcpy(commands[command_amount].description, "Bluetooth State");
-  commands[command_amount].argn = 1;
-  commands[command_amount].fn = cmd_bt_state;
-
+  commands[command_amount] = new Command("+BTSTATE", "Bluetooth State", 1, cmd_bt_state);
   command_amount++;
 
-  strcpy(commands[command_amount].cmd, "WORK");
-  strcpy(commands[command_amount].description, "Bluetooth Mode");
-  commands[command_amount].argn = 1;
-  commands[command_amount].fn = cmd_bt_work;
-
-  command_amount++;  
-  strcpy(commands[command_amount].cmd, "SEND_SENSORS");
-  strcpy(commands[command_amount].description, "Send Sensor Data");
-  commands[command_amount].argn = 0;
-  commands[command_amount].fn = cmd_send_sensors;
-
+  commands[command_amount] = new Command("WORK", "Bluetooth Mode", 1, cmd_bt_work);
+  command_amount++;
+	  
+  commands[command_amount] = new Command("SEND_SENSORS", "Send Sensor Data", 0, cmd_send_sensors);
   command_amount++;
 
-  strcpy(commands[command_amount].cmd, "OK");
-  strcpy(commands[command_amount].description, "BT OK");
-  commands[command_amount].argn = 0;
-  commands[command_amount].fn = cmd_bt_ok;
-
+  commands[command_amount] = new Command("OK", "BT OK", 0, cmd_bt_ok);
   command_amount++; 
 }
 
 void send_config(Stream &ser)
 {
   ser.println("Config Pairs");
-  for (uint8_t i = 0; i <= sensor_amount; i++)
+  for (uint8_t i = 0; i < sensor_amount; i++)
   {
-    ser.print(sensors[i].key);
-    ser.print(" ");
-    ser.println(sensors[i].description);
+    sensors[i]->print_config(ser);
   }
 }
 
 void send_sensors(Stream &ser)
 {
   ser.println("New DataGroup");
-  for (uint8_t i = 0; i <= sensor_amount; i++)
+  for (uint8_t i = 0; i < sensor_amount; i++)
   {
-    ser.print(sensors[i].key);
-    ser.print(" ");
-    sensors[i].fn(i, ser);
+  	sensors[i]->print_data(i, ser);
   }
 }
 
@@ -199,7 +172,7 @@ void parse_command(char command[], Stream &serout, const char delim[])
      Serial.print(strlen(sub));
      Serial.println(")");
      */
-    int ret = strcmp(commands[i].cmd, sub);
+    int ret = strcmp(commands[i]->cmd, sub);
 
     //Serial.print(" Ret: ");
     //Serial.println(ret);
@@ -207,7 +180,7 @@ void parse_command(char command[], Stream &serout, const char delim[])
     if ( ret == 0 )
     {
       //sub = strtok_r(NULL, delim, &ptr);
-      commands[i].fn(i, ptr, serout);
+      commands[i]->fn(i, ptr, serout);
     }
   }
 }
@@ -216,12 +189,7 @@ uint8_t bt_ok = 0;
 
 void cmd_bt_ok(uint8_t id, char* args, Stream &ser)
 {
-  ser.print("CMD: ");
-  ser.print(commands[id].cmd);
-  ser.print(" Args: ");
-  ser.print(commands[id].argn);
-  ser.print(" Desc: ");
-  ser.println(commands[id].description);
+  commands[id]->print_info(args, ser);
 
   //ser.print("Args: ");
   //ser.println(args);  
@@ -233,17 +201,7 @@ uint8_t bt_state = 1;
 
 void cmd_bt_state(uint8_t id, char* args, Stream &ser)
 {
-  ser.print("CMD: ");
-  ser.print(commands[id].cmd);
-  ser.print(" Argn(");
-  ser.print(commands[id].argn);
-  ser.print("): ");
-  ser.println(args);
-  //ser.print(" Desc: ");
-  //ser.println(commands[id].description);
-
-  //ser.print("Args: ");
-  //ser.println(args);
+  commands[id]->print_info(args, ser);
 
   char *ptr = args;
   char *sub = get_token(NULL, &ptr, DELIM_BTAT);
@@ -262,15 +220,7 @@ uint8_t bt_work = 0;
 
 void cmd_bt_work(uint8_t id, char* args, Stream &ser)
 {
-  ser.print("CMD: ");
-  ser.print(commands[id].cmd);
-  ser.print(" Args: ");
-  ser.print(commands[id].argn);
-  ser.print(" Desc: ");
-  ser.println(commands[id].description);  
-
-  ser.print("Args: ");
-  ser.println(args);
+	commands[id]->print_info(args, ser);
 
   bt_work = 1;
 }
@@ -335,6 +285,18 @@ void CheckOK()
   //Serial.println("DEBU2: END");
 }
 
+void wait_for(uint8_t &value, uint8_t equals, char desc[])
+{
+  if ( value != equals )
+  {
+    Serial.println("Waiting for module to switch mode");
+    while ( value != equals )
+    {
+      get_command(blueToothSerial, Serial, DELIM_BTAT);
+    }
+  }
+}
+
 void setupBlueToothConnection()
 {
   char* cmd;
@@ -366,37 +328,30 @@ void setupBlueToothConnection()
     {
     case 0:
       Serial.println("setupBlueToothConnection");
-      cmd = "\r\n+STWMOD=0\r\n";
+      cmd = "+STWMOD=0";
       break;
     case 1:
-      cmd = "\r\n+STNA=BikeComputer\r\n";
+      cmd = "+STNA=BikeComputer";
       break;
     case 2:
-      cmd = "\r\n+STAUTO=0\r\n";
+      cmd = "+STAUTO=0";
       break;
     case 3:
-      cmd = "\r\n+STOAUT=1\r\n";
+      cmd = "+STOAUT=1";
       break;
     case 4:    
       //delay(100); // This delay is required.
       //sendBlueToothCommand("\r\n +STPIN=2222\r\n");
       break;
-    case 5:    
-      if ( bt_work == 0 )
-      {
-        Serial.println("Waiting for module to switch mode");
-        while ( bt_work == 0 )
-        {
-          get_command(blueToothSerial, Serial, DELIM_BTAT);
-        }
-      }
+    case 5:
+			wait_for(bt_work, 1, "Waiting for module to switch mode");    
       execute = 0;
       //delay(1000);
       break;
     case 6:
       digitalWrite(BT_RESET_PIN, LOW);    
       delay(1000); // This delay is required.
-      cmd = "\r\n+INQ=1\r\n";
+      cmd = "+INQ=1";
       break;
     case 7:
       bt_status = digitalRead(BT_STATUS_PIN);
@@ -410,15 +365,11 @@ void setupBlueToothConnection()
     if ( execute == 1 )
     {
       bt_ok = 0;
-      if ( bt_state != 1 )
-      {
-        Serial.println("Waiting for ready state");
-        while ( bt_state == 0 )
-        {
-          get_command(blueToothSerial, Serial, DELIM_BTAT);
-        }
-      }
+      wait_for(bt_state, 1, "Waiting for ready state");
+      
+      blueToothSerial.print("\r\n");
       blueToothSerial.print(cmd);
+      blueToothSerial.print("\r\n");
       Serial.print(cmd);
       //delay(1500);
       CheckOK();
@@ -469,16 +420,7 @@ void cmd_send_sensors(uint8_t id, char* args, Stream &ser)
 
 void cmd_general(uint8_t id, char* args, Stream &ser)
 {
-  ser.print("CMD: ");
-  ser.print(commands[id].cmd);
-  ser.print(" Args: ");
-  ser.print(commands[id].argn);
-  ser.print(" Desc: ");
-  ser.println(commands[id].description);
-
-  ser.print("Args: ");
-  ser.println(args);  
-
+  commands[id]->print_info(args, ser);
 }
 
 void get_command(Stream &ser, Stream &serout, const char delim[])
@@ -533,8 +475,8 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 void loop() {
   //send_sensors();
   //blueToothSerial.println("Test");
-
-  get_command(blueToothSerial, Serial, DELIM_NORMAL);
+  bt_msg_status = digitalRead(BT_STATUS_PIN);
+  get_command(blueToothSerial, Serial, bt_msg_status ? DELIM_NORMAL : DELIM_BTAT );
 }
 
 
