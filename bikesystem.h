@@ -41,13 +41,15 @@ struct Command
   char description[32];
   uint8_t argn;
   CommandFn fn;
+  bool sendBT;
   
-  Command(char _cmd[], char _description[], uint8_t _argn, CommandFn _fn)
+  Command(char _cmd[], char _description[], uint8_t _argn, CommandFn _fn, bool _sendBT)
   {
 		strcpy(cmd, _cmd);
   	strcpy(description, _description);
   	argn = _argn;
   	fn = _fn;
+	sendBT = _sendBT;
 	}
 	
 	void print_info(char* args, Stream &ser)
