@@ -30,10 +30,12 @@ void DHT_get_temp(uint8_t id, Stream &ser);
 void DHT_get_humidity(uint8_t id, Stream &ser);
 void config_get();
 void config_cmd();
-void send_config(Stream &ser);
-void send_sensors(Stream &ser);
 char* get_token(char in_string[], char **ptr, const char delim[]);
 void parse_command(char command[], Stream &serout, const char delim[]);
+void cmd_send_config(uint8_t id, char* args, Stream &ser);
+void cmd_send_sensors(uint8_t id, char* args, Stream &ser);
+void cmd_general(uint8_t id, char* args, Stream &ser);
+void get_command(Stream &ser, Stream &serout, const char delim[]);
 void cmd_bt_ok(uint8_t id, char* args, Stream &ser);
 void cmd_bt_state(uint8_t id, char* args, Stream &ser);
 void cmd_bt_work(uint8_t id, char* args, Stream &ser);
@@ -44,12 +46,10 @@ void BT_Disc();
 void CheckOK();
 void wait_for(uint8_t &value, uint8_t equals, char desc[]);
 void setupBlueToothConnection();
+void send_config(Stream &ser);
+void send_sensors(Stream &ser);
 void setup_softwareserial();
 //
-void cmd_send_config(uint8_t id, char* args, Stream &ser);
-void cmd_send_sensors(uint8_t id, char* args, Stream &ser);
-void cmd_general(uint8_t id, char* args, Stream &ser);
-void get_command(Stream &ser, Stream &serout, const char delim[]);
 //
 
 #include "D:\Development\arduino-1.0.5\hardware\arduino\variants\standard\pins_arduino.h" 
