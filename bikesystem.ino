@@ -269,36 +269,36 @@ void cmd_bt_work(uint8_t id, char* args, Stream &ser)
 
 // Bluetooth Setup Code
 
-void resetBT()
+void bt_reset()
 {
  digitalWrite(BT_RESET_PIN, LOW);
  delay(2000);
  digitalWrite(BT_RESET_PIN, HIGH);
 }
  
-void enterComMode()
+void bt_enter_commode()
 {
  blueToothSerial.flush();
  delay(500);
  //digitalWrite(PIO11, LOW);
- resetBT();
+ bt_reset();
  delay(500);
  blueToothSerial.begin(57600);
 }
  
-void enterATMode()
+void bt_enter_atmode()
 {
  Serial.println("Resetting bluetooth"); 
  blueToothSerial.flush();
  delay(500);
  //digitalWrite(PIO11, HIGH);
- resetBT();
+ bt_reset();
  delay(500);
  blueToothSerial.begin(38400);
  
 }
 
-void BT_Disc()
+void bt_disc()
 {
 	digitalWrite(BT_DISCO_PIN, LOW);
 	delay(100);
@@ -307,7 +307,7 @@ void BT_Disc()
 }
 
 //Checks if the response "OK" is received.
-void CheckOK()
+void bt_check_ok()
 {
 	char a,b;
 	uint16_t watch_counter = 0;
@@ -322,15 +322,15 @@ void CheckOK()
 
 		if (watch_counter++ > 10000)
 		{
-			resetBT();
-			BT_Disc();
+			bt_reset();
+			bt_disc();
 			bt_initstate = 0;
 			return;
 		}
 	}
 }
 
-void wait_for(uint8_t &value, uint8_t equals, char desc[])
+void bt_wait_for(uint8_t &value, uint8_t equals, char desc[])
 {
 	if ( value != equals )
 	{
@@ -342,7 +342,7 @@ void wait_for(uint8_t &value, uint8_t equals, char desc[])
 	}
 }
 
-void setupBlueToothConnection()
+void bt_setup()
 {
 	char* cmd;
 	boolean execute;
@@ -362,8 +362,8 @@ void setupBlueToothConnection()
 		return; 
 	}
 
-	enterATMode();
-	//BT_Disc();
+	bt_enter_atmode();
+	//bt_disc();
 
 	while ( 1 )
 	{
@@ -392,7 +392,7 @@ void setupBlueToothConnection()
 			//sendBlueToothCommand("\r\n +STPIN=2222\r\n");
 			break;
 		case 5:
-			wait_for(bt_work, 1, "Waiting for module to switch mode");    
+			bt_wait_for(bt_work, 1, "Waiting for module to switch mode");    
 			execute = 0;
 			//delay(1000);
 			break;
@@ -413,14 +413,14 @@ void setupBlueToothConnection()
 		if ( execute == 1 )
 		{
 			bt_ok = 0;
-			wait_for(bt_state, 1, "Waiting for ready state");
+			bt_wait_for(bt_state, 1, "Waiting for ready state");
 
 			blueToothSerial.print("\r\n");
 			blueToothSerial.print(cmd);
 			blueToothSerial.print("\r\n");
 			Serial.println(cmd);
 			delay(1500);
-			CheckOK();
+			bt_check_ok();
 			delay(1000);
 		}
 		Serial.println("--\n");
@@ -453,7 +453,7 @@ void setup_softwareserial()
 {
 	pinMode(RxD, INPUT);
 	pinMode(TxD, OUTPUT);
-	setupBlueToothConnection();
+	bt_setup();
 }
 
 void setup() {
