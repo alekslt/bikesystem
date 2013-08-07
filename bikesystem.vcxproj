@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{C846B70C-1FE3-4A61-B664-72AF26C284A1}</ProjectGuid>
+    <ProjectGuid>{3CABCD9E-261D-4BDD-AEF3-F87F7E11ED12}</ProjectGuid>
     <RootNamespace>bikesystem</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -41,6 +41,10 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>D:\Development\arduino-1.0.5\hardware\arduino\cores\arduino;D:\Development\arduino-1.0.5\hardware\arduino\variants\standard;D:\Development\arduino-1.0.5\libraries\SoftwareSerial;D:\Development\arduino-1.0.5\libraries\SoftwareSerial\utility;D:\Development\arduino-1.0.5\libraries\DHT;D:\Development\arduino-1.0.5\libraries\DHT\utility;d:\development\arduino-1.0.5\hardware\tools\avr\avr\include\;d:\development\arduino-1.0.5\hardware\tools\avr\avr\include\avr\;d:\development\arduino-1.0.5\hardware\tools\avr\avr\;d:\development\arduino-1.0.5\hardware\tools\avr\lib\gcc\avr\4.3.2\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>D:\Development\arduinoprojects\bikesystem\Visual Micro\.bikesystem.vsarduino.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <IgnoreStandardIncludePath>true</IgnoreStandardIncludePath>
+      <PreprocessorDefinitions>__AVR_ATmega328P__;ARDUINO=105;__AVR__;F_CPU=16000000L;__cplusplus;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -60,6 +64,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="bikesystem.ino">
+      <FileType>CppCode</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bikesystem.h">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="Visual Micro\.bikesystem.vsarduino.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
