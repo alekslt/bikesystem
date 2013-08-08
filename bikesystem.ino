@@ -132,8 +132,11 @@ char* get_token(char in_string[], char **ptr, const char delim[])
 
 void parse_command(char command[], Stream &serout, const char delim[])
 {
-	serout.print("\nParsing command: ");
-	serout.println(command);
+	if ( DEBUG_ENABLED )
+	{
+		serout.print("\nParsing command: ");
+		serout.println(command);
+	}
 
 	char *ptr;
 	char *sub = get_token(command, &ptr, delim);
@@ -186,10 +189,6 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 		}
 
 		char c = ser.read();
-		serout.print(c);
-		serout.print("[");
-		serout.print((uint8_t)c);
-		serout.print("]");
 
 		if ( bt_msg_status == 1 && bt_state == 4 && bt_connect == 1)
 		{
@@ -199,6 +198,14 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 		if ( c == '\n' ) {
 			//serout.println("End of Line");
 			return;
+		}
+
+		if ( DEBUG_ENABLED )
+		{
+			serout.print(c);
+			serout.print("[");
+			serout.print((uint8_t)c);
+			serout.print("]");
 		}
 
 		if ( (uint8_t)c < CMD_ASCII_START || (uint8_t)c > CMD_ASCII_END ) { 
@@ -213,10 +220,10 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 			if ( cmd_pos > 1 )
 			{
 
-				serout.print("\nCommand: (");
-				serout.print(cmd_pos);
-				serout.print(")"); 
-				serout.print(cmd_buf);
+				//serout.print("\nCommand: (");
+				//serout.print(cmd_pos);
+				//serout.print(")"); 
+				//serout.print(cmd_buf);
 				//serout.print(" BTstate: "); 
 				//serout.println(bt_msg_status ? "Active" : "Disconnected");
 				parse_command(cmd_buf, serout, delim);
