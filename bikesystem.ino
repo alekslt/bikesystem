@@ -3,23 +3,14 @@
 // Includes
 #include "bikesystem.h"
 #include <SoftwareSerial.h>
-
 #include "DHT.h"
-
 #include <string.h>
+
+#include "bt_func.h"
 
 // Defines
 #define MAX_STRING_LEN  128
-
 #define DHTPIN 2     // what pin we're connected to
-
-#define RxD 11
-#define TxD 12
-
-#define BT_STATUS_PIN 3
-#define BT_DISCO_PIN 4
-#define BT_RESET_PIN 5
-
 #define DEBUG_ENABLED  0
 
 // Attributes
@@ -46,32 +37,15 @@ const uint8_t CMD_ASCII_END = 127;
 // General vars
 bool has_sent_greeting = false;
 
-// Bluetooth vars
-uint8_t bt_msg_status = 0;
-uint8_t bt_initstate = 0;
-uint8_t bt_ok = 0;
-uint8_t bt_work = 0;
-uint8_t bt_state = 1;
-uint8_t bt_connect = 0;
-
 // Declarations
 void send_config(Stream &ser);
 void send_sensors(Stream &ser);
-
-char* get_token(char in_string[], char **ptr, const char delim[]);
-void get_command(Stream &ser, Stream &serout, const char delim[]);
 
 // Command declerations
 void cmd_send_config(uint8_t id, char* args, Stream &ser);
 void cmd_send_sensors(uint8_t id, char* args, Stream &ser);
 
 void cmd_general(uint8_t id, char* args, Stream &ser);
-
-void cmd_bt_ok(uint8_t id, char* args, Stream &ser);
-void cmd_bt_state(uint8_t id, char* args, Stream &ser);
-void cmd_bt_st(uint8_t id, char* args, Stream &ser);
-void cmd_bt_connect(uint8_t id, char* args, Stream &ser);
-void cmd_bt_work(uint8_t id, char* args, Stream &ser);
 
 
 // Definitions
@@ -255,233 +229,6 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 	//  buf[i] = 0; // 0 string terminator just in case
 }
 
-// Bluetooth commands
-void cmd_bt_ok(uint8_t id, char* args, Stream &ser)
-{
-	commands[id]->print_info(args, ser);
-
-	bt_ok = 1;
-}
-
-void cmd_bt_state(uint8_t id, char* args, Stream &ser)
-{
-	commands[id]->print_info(args, ser);
-
-	char *ptr = args;
-	char *sub = get_token(NULL, &ptr, DELIM_BTAT);
-
-	//ser.print("Token 1: ");
-	//ser.println(sub);
-
-	uint8_t t1 = atoi(sub);
-	bt_state = t1;
-
-	if ( bt_state == 1 )
-	{
-		bt_connect = 0;
-		has_sent_greeting = false;
-	}
-	//ser.print("Token 1-converted: ");
-	//ser.println(bt_state);
-}
-
-void cmd_bt_st(uint8_t id, char* args, Stream &ser)
-{
-}
-
-void cmd_bt_work(uint8_t id, char* args, Stream &ser)
-{
-	commands[id]->print_info(args, ser);
-
-	bt_work = 1;
-}
-
-void cmd_bt_connect(uint8_t id, char* args, Stream &ser)
-{
-	bt_connect = 1;
-}
-
-// Bluetooth Setup Code
-
-void bt_reset()
-{
- digitalWrite(BT_RESET_PIN, LOW);
- delay(2000);
- digitalWrite(BT_RESET_PIN, HIGH);
-}
- 
-void bt_enter_commode()
-{
- Serial.println("Enter ComMode"); 
- blueToothSerial.flush();
- delay(500);
- //digitalWrite(PIO11, LOW);
- digitalWrite(BT_RESET_PIN, LOW);
- delay(500);
- digitalWrite(BT_RESET_PIN, HIGH);
- delay(500);
- blueToothSerial.begin(38400);
-}
- 
-void bt_enter_atmode()
-{
- Serial.println("Resetting bluetooth"); 
- blueToothSerial.flush();
- delay(500);
- //digitalWrite(PIO11, HIGH);
- bt_reset();
- delay(500);
- blueToothSerial.begin(38400);
- 
-}
-
-void bt_disc()
-{
-	digitalWrite(BT_DISCO_PIN, LOW);
-	delay(100);
-	digitalWrite(BT_DISCO_PIN, HIGH);
-	delay(10);
-}
-
-//Checks if the response "OK" is received.
-void bt_check_ok()
-{
-	char a,b;
-	uint16_t watch_counter = 0;
-
-	bt_ok = 0;
-	Serial.print("Waiting for reply: bt_ok=");
-	Serial.println(bt_ok);
-
-	while( ! bt_ok )
-	{
-		get_command(blueToothSerial, Serial, DELIM_BTAT);
-		delay(10);
-		if (watch_counter++ > 5000)
-		{
-			bt_reset();
-			bt_disc();
-			bt_initstate = 0;
-			Serial.println("Timed out. Restarting");
-			return;
-		}
-	}
-}
-
-void bt_wait_for(uint8_t &value, uint8_t equals, char desc[])
-{
-	if ( value != equals )
-	{
-		Serial.println(desc);
-		while ( value != equals )
-		{
-			get_command(blueToothSerial, Serial, DELIM_BTAT);
-		}
-	}
-}
-
-void bt_setup()
-{
-	char* cmd;
-	boolean execute;
-
-	pinMode(BT_STATUS_PIN, INPUT);
-	pinMode(BT_DISCO_PIN, OUTPUT);
-	pinMode(BT_RESET_PIN, OUTPUT);
-	digitalWrite(BT_RESET_PIN, HIGH);
-	
-	blueToothSerial.begin(38400); //Set BluetoothBee BaudRate to default baud rate 38400
-
-	uint8_t bt_status = digitalRead(BT_STATUS_PIN);
-	Serial.print("Bluetooth state: "); 
-	Serial.println(bt_status ? "Active" : "Disconnected");
-
-	if ( bt_status == 1 )
-	{
-		Serial.println("Device already connected. Skipping bt init");
-		bt_state = 4;
-		bt_connect = 1;
-
-		return; 
-	}
-
-	bt_enter_atmode();
-	//bt_disc();
-
-	while ( 1 )
-	{
-		execute = 1;
-
-		Serial.print("Step: ");
-		Serial.println(bt_initstate);
-
-		switch ( bt_initstate )
-		{
-		case 0:
-			Serial.println("setupBlueToothConnection");
-			cmd = "+STWMOD=0";
-			break;
-		case 1:
-			cmd = "+STNA=BikeComputer";
-			break;
-		case 2:
-			cmd = "+STAUTO=0";
-			break;
-		case 3:
-			cmd = "+STOAUT=1";
-			break;
-		case 4:    
-			//delay(100); // This delay is required.
-			//sendBlueToothCommand("\r\n +STPIN=2222\r\n");
-			execute = 0;
-			break;
-		case 5:
-			bt_wait_for(bt_work, 1, "Waiting for module to switch mode");    
-			execute = 0;
-			//delay(1000);
-			break;
-		case 6:
-			digitalWrite(BT_DISCO_PIN, LOW);    
-			delay(1000); // This delay is required.
-			cmd = "+INQ=1";
-			break;
-		case 7:
-			bt_status = digitalRead(BT_STATUS_PIN);
-			Serial.print("Bluetooth state: "); 
-			Serial.println(bt_status ? "Active" : "Disconnected");
-			execute = 0;
-			break;
-
-		case 8:
-			delay(1000);
-			blueToothSerial.flush();
-			blueToothSerial.begin(38400);
-
-			//bt_enter_commode();
-
-			Serial.println("BT Setup done");
-			Serial.println("--\n");
-			return;    
-			break;
-		}
-
-		if ( execute == 1 )
-		{
-			bt_ok = 0;
-			bt_wait_for(bt_state, 1, "Waiting for ready state");
-
-			blueToothSerial.print("\r\n");
-			blueToothSerial.print(cmd);
-			blueToothSerial.print("\r\n");
-			Serial.println(cmd);
-			delay(1500);
-			bt_check_ok();
-			delay(100);
-		}
-		Serial.println("--\n");
-		bt_initstate++;
-	}
-}
 
 // Sensor and Actuator Commands
 void send_config(Stream &ser)
@@ -503,56 +250,12 @@ void send_sensors(Stream &ser)
 }
 
 // Main setup and loop
-void bt_setup2()
-{
-	char* cmd;
-	boolean execute;
-
-	pinMode(BT_STATUS_PIN, INPUT);
-	pinMode(BT_DISCO_PIN, OUTPUT);
-	pinMode(BT_RESET_PIN, OUTPUT);
-	digitalWrite(BT_RESET_PIN, HIGH);
-
-	uint8_t bt_status = digitalRead(BT_STATUS_PIN);
-	Serial.print("Bluetooth state: "); 
-	Serial.println(bt_status ? "Active" : "Disconnected");
-
-	blueToothSerial.begin(38400); //Set BluetoothBee BaudRate to default baud rate 38400
-
-	if ( bt_status == 1 )
-	{
-		Serial.println("Device already connected. Skipping bt init");
-		bt_state = 4;
-		bt_connect = 1;
-
-		return; 
-	}
-
-	//bt_enter_atmode();
-	
-	  //digitalWrite(BT_RESET_PIN, LOW);
-	 //delay(100);
-	//digitalWrite(BT_RESET_PIN, HIGH);
-
-	 blueToothSerial.print("\r\n+STWMOD=0\r\n"); //set the bluetooth work in slave mode
-	 blueToothSerial.print("\r\n+STNA=BikeComputer\r\n"); //set the bluetooth name as "SeeedBTSlave"
-	 //blueToothSerial.print("\r\n+STPIN=0000\r\n");//Set SLAVE pincode"0000"
-	 blueToothSerial.print("\r\n+STOAUT=1\r\n"); // Permit Paired device to connect me
-	 blueToothSerial.print("\r\n+STAUTO=0\r\n"); // Auto-connection should be forbidden here
-	 delay(2000); // This delay is required.
-	 blueToothSerial.print("\r\n+INQ=1\r\n"); //make the slave bluetooth inquirable 
-	 Serial.println("The slave bluetooth is inquirable!");
-	 delay(2000); // This delay is required.
-	 blueToothSerial.flush();
-
-}
 
 void setup_softwareserial()
 {
 	pinMode(RxD, INPUT);
 	pinMode(TxD, OUTPUT);
 	//bt_setup();
-	bt_setup();
 }
 
 void setup() {
@@ -567,6 +270,8 @@ void setup() {
 	//delay(1000);
 	setup_softwareserial();
 
+	bt_setup();
+
 	//Serial.println("DHT Begin");
 	dht.begin();
 
@@ -575,30 +280,8 @@ void setup() {
 } 
 
 void loop() {
-	//send_sensors();
-	//blueToothSerial.println("Test");
 	bt_msg_status = digitalRead(BT_STATUS_PIN);
 
-	/*
-	char recvChar;
-
-	if(blueToothSerial.available()) {//check if there's any data sent from the remote bluetooth shield
-		recvChar = blueToothSerial.read();
-		Serial.print(recvChar);
-	}
-	if(Serial.available()) {//check if there's any data sent from the local serial terminal, you can add the other applications here
-		recvChar = Serial.read();
-		blueToothSerial.print(recvChar);
-	}
-	*/
-
-	/*
-	if ( bt_msg_status == false && has_sent_greeting )
-	{
-		Serial.println("Resetting has_sent");
-		has_sent_greeting = false;
-	}
-	*/
 	if ( !has_sent_greeting )
 	{
 		if ( bt_state == 4 && bt_connect == 1)
@@ -614,8 +297,6 @@ void loop() {
 
 	// get_command(blueToothSerial, Serial, (has_sent_greeting && bt_msg_status == 1) ? DELIM_NORMAL : DELIM_BTAT );
 	get_command(blueToothSerial, Serial, DELIM_BTAT );
-
-
 	
 }
 

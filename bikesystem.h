@@ -3,6 +3,10 @@
 
 #include "Arduino.h"
 
+// Forwards
+class Stream;
+class SoftwareSerial;
+
 typedef void (*SensorDataFn)(uint8_t id, Stream &ser);
 typedef void (*CommandFn)(uint8_t id, char* args, Stream &ser);
 
@@ -66,5 +70,24 @@ struct Command
 	}
 
 };
+
+extern struct Serial_info *sensors[10];
+extern uint8_t sensor_amount;
+
+extern struct Command *commands[10];
+extern uint8_t command_amount;
+
+extern const char DELIM_NORMAL[];
+extern const char DELIM_BTAT[];
+
+extern const uint8_t CMD_ASCII_START;
+extern const uint8_t CMD_ASCII_END;
+
+extern bool has_sent_greeting;
+
+extern SoftwareSerial blueToothSerial;
+
+char* get_token(char in_string[], char **ptr, const char delim[]);
+void get_command(Stream &ser, Stream &serout, const char delim[]);
 
 #endif // BIKESYSTEM_H
