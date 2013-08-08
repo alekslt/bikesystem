@@ -43,6 +43,8 @@ const char DELIM_BTAT[] = ":=";
 const uint8_t CMD_ASCII_START = 0;
 const uint8_t CMD_ASCII_END = 127;
 
+// General vars
+bool has_sent_greeting = false;
 
 // Bluetooth vars
 uint8_t bt_msg_status = 0;
@@ -50,6 +52,7 @@ uint8_t bt_initstate = 0;
 uint8_t bt_ok = 0;
 uint8_t bt_work = 0;
 uint8_t bt_state = 1;
+uint8_t bt_connect = 0;
 
 // Declarations
 void send_config(Stream &ser);
@@ -66,6 +69,8 @@ void cmd_general(uint8_t id, char* args, Stream &ser);
 
 void cmd_bt_ok(uint8_t id, char* args, Stream &ser);
 void cmd_bt_state(uint8_t id, char* args, Stream &ser);
+void cmd_bt_st(uint8_t id, char* args, Stream &ser);
+void cmd_bt_connect(uint8_t id, char* args, Stream &ser);
 void cmd_bt_work(uint8_t id, char* args, Stream &ser);
 
 
@@ -113,17 +118,23 @@ void config_cmd()
 	commands[command_amount] = new Command("CONFIG", "Send Config", 0, cmd_send_config, true);
 	command_amount++;
 
-	commands[command_amount] = new Command("+BTSTATE", "Bluetooth State", 1, cmd_bt_state, false);
-	command_amount++;
-
-	commands[command_amount] = new Command("WORK", "Bluetooth Mode", 1, cmd_bt_work, false);
-	command_amount++;
-
 	commands[command_amount] = new Command("SEND_SENSORS", "Send Sensor Data", 0, cmd_send_sensors, true);
 	command_amount++;
 
 	commands[command_amount] = new Command("OK", "BT OK", 0, cmd_bt_ok, false);
 	command_amount++; 
+
+	commands[command_amount] = new Command("+BTSTATE", "Bluetooth State", 1, cmd_bt_state, false);
+	command_amount++;
+
+	commands[command_amount] = new Command("+BTST", "Bluetooth St", 1, cmd_bt_st, false);
+	command_amount++;
+
+	commands[command_amount] = new Command("WORK", "Bluetooth Mode", 1, cmd_bt_work, false);
+	command_amount++;
+
+	commands[command_amount] = new Command("CONNECT", "Bluetooth Mode", 1, cmd_bt_connect, false);
+	command_amount++;
 }
 
 char* get_token(char in_string[], char **ptr, const char delim[])
@@ -147,6 +158,9 @@ char* get_token(char in_string[], char **ptr, const char delim[])
 
 void parse_command(char command[], Stream &serout, const char delim[])
 {
+	serout.print("\nParsing command: ");
+	serout.println(command);
+
 	char *ptr;
 	char *sub = get_token(command, &ptr, delim);
 	for (int i = 0; i < command_amount; i++)
@@ -161,8 +175,11 @@ void parse_command(char command[], Stream &serout, const char delim[])
 			} else {
 				commands[i]->fn(i, ptr, serout);
 			}
+			return;
 		}
 	}
+	serout.print("\nCommand not found: ");
+	serout.println(command);
 }
 
 // General commands setup
@@ -187,7 +204,7 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 	//serout.println(ser.available());
 	//delay(500);
 	// wait for character to arrive
-	if (ser.available() != 0)
+	if ( ser.available() )
 	{
 		if ( cmd_pos == 0 )
 		{
@@ -195,22 +212,25 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 		}
 
 		char c = ser.read();
+		serout.print(c);
+		serout.print("[");
+		serout.print((uint8_t)c);
+		serout.print("]");
+
+		if ( bt_msg_status == 1 && bt_state == 4 && bt_connect == 1)
+		{
+			//ser.write(c);
+		}
+
 		if ( c == '\n' ) {
 			//serout.println("End of Line");
-			return; 
+			return;
 		}
 
 		if ( (uint8_t)c < CMD_ASCII_START || (uint8_t)c > CMD_ASCII_END ) { 
 			return; 
 		}
 		cmd_buf[cmd_pos++] = c;
-
-		
-		serout.print(c);
-		serout.print("[");
-		serout.print((uint8_t)c);
-		serout.print("]");
-		
 
 		if (c == '\r') // is it the terminator byte?
 		{
@@ -219,12 +239,12 @@ void get_command(Stream &ser, Stream &serout, const char delim[])
 			if ( cmd_pos > 1 )
 			{
 
-				serout.print("Command: (");
+				serout.print("\nCommand: (");
 				serout.print(cmd_pos);
 				serout.print(")"); 
 				serout.print(cmd_buf);
-				serout.print(" BTstate: "); 
-				serout.println(bt_msg_status ? "Active" : "Disconnected");
+				//serout.print(" BTstate: "); 
+				//serout.println(bt_msg_status ? "Active" : "Disconnected");
 				parse_command(cmd_buf, serout, delim);
 			}
 			cmd_pos = 0;
@@ -256,8 +276,17 @@ void cmd_bt_state(uint8_t id, char* args, Stream &ser)
 	uint8_t t1 = atoi(sub);
 	bt_state = t1;
 
+	if ( bt_state == 1 )
+	{
+		bt_connect = 0;
+		has_sent_greeting = false;
+	}
 	//ser.print("Token 1-converted: ");
 	//ser.println(bt_state);
+}
+
+void cmd_bt_st(uint8_t id, char* args, Stream &ser)
+{
 }
 
 void cmd_bt_work(uint8_t id, char* args, Stream &ser)
@@ -265,6 +294,11 @@ void cmd_bt_work(uint8_t id, char* args, Stream &ser)
 	commands[id]->print_info(args, ser);
 
 	bt_work = 1;
+}
+
+void cmd_bt_connect(uint8_t id, char* args, Stream &ser)
+{
+	bt_connect = 1;
 }
 
 // Bluetooth Setup Code
@@ -278,12 +312,15 @@ void bt_reset()
  
 void bt_enter_commode()
 {
+ Serial.println("Enter ComMode"); 
  blueToothSerial.flush();
  delay(500);
  //digitalWrite(PIO11, LOW);
- bt_reset();
+ digitalWrite(BT_RESET_PIN, LOW);
  delay(500);
- blueToothSerial.begin(57600);
+ digitalWrite(BT_RESET_PIN, HIGH);
+ delay(500);
+ blueToothSerial.begin(38400);
 }
  
 void bt_enter_atmode()
@@ -319,12 +356,13 @@ void bt_check_ok()
 	while( ! bt_ok )
 	{
 		get_command(blueToothSerial, Serial, DELIM_BTAT);
-
-		if (watch_counter++ > 10000)
+		delay(10);
+		if (watch_counter++ > 5000)
 		{
 			bt_reset();
 			bt_disc();
 			bt_initstate = 0;
+			Serial.println("Timed out. Restarting");
 			return;
 		}
 	}
@@ -334,7 +372,7 @@ void bt_wait_for(uint8_t &value, uint8_t equals, char desc[])
 {
 	if ( value != equals )
 	{
-		Serial.println("Waiting for module to switch mode");
+		Serial.println(desc);
 		while ( value != equals )
 		{
 			get_command(blueToothSerial, Serial, DELIM_BTAT);
@@ -352,6 +390,8 @@ void bt_setup()
 	pinMode(BT_RESET_PIN, OUTPUT);
 	digitalWrite(BT_RESET_PIN, HIGH);
 	
+	blueToothSerial.begin(38400); //Set BluetoothBee BaudRate to default baud rate 38400
+
 	uint8_t bt_status = digitalRead(BT_STATUS_PIN);
 	Serial.print("Bluetooth state: "); 
 	Serial.println(bt_status ? "Active" : "Disconnected");
@@ -359,6 +399,9 @@ void bt_setup()
 	if ( bt_status == 1 )
 	{
 		Serial.println("Device already connected. Skipping bt init");
+		bt_state = 4;
+		bt_connect = 1;
+
 		return; 
 	}
 
@@ -390,6 +433,7 @@ void bt_setup()
 		case 4:    
 			//delay(100); // This delay is required.
 			//sendBlueToothCommand("\r\n +STPIN=2222\r\n");
+			execute = 0;
 			break;
 		case 5:
 			bt_wait_for(bt_work, 1, "Waiting for module to switch mode");    
@@ -405,9 +449,20 @@ void bt_setup()
 			bt_status = digitalRead(BT_STATUS_PIN);
 			Serial.print("Bluetooth state: "); 
 			Serial.println(bt_status ? "Active" : "Disconnected");
-			return;    
+			execute = 0;
 			break;
 
+		case 8:
+			delay(1000);
+			blueToothSerial.flush();
+			blueToothSerial.begin(38400);
+
+			//bt_enter_commode();
+
+			Serial.println("BT Setup done");
+			Serial.println("--\n");
+			return;    
+			break;
 		}
 
 		if ( execute == 1 )
@@ -421,7 +476,7 @@ void bt_setup()
 			Serial.println(cmd);
 			delay(1500);
 			bt_check_ok();
-			delay(1000);
+			delay(100);
 		}
 		Serial.println("--\n");
 		bt_initstate++;
@@ -448,11 +503,55 @@ void send_sensors(Stream &ser)
 }
 
 // Main setup and loop
+void bt_setup2()
+{
+	char* cmd;
+	boolean execute;
+
+	pinMode(BT_STATUS_PIN, INPUT);
+	pinMode(BT_DISCO_PIN, OUTPUT);
+	pinMode(BT_RESET_PIN, OUTPUT);
+	digitalWrite(BT_RESET_PIN, HIGH);
+
+	uint8_t bt_status = digitalRead(BT_STATUS_PIN);
+	Serial.print("Bluetooth state: "); 
+	Serial.println(bt_status ? "Active" : "Disconnected");
+
+	blueToothSerial.begin(38400); //Set BluetoothBee BaudRate to default baud rate 38400
+
+	if ( bt_status == 1 )
+	{
+		Serial.println("Device already connected. Skipping bt init");
+		bt_state = 4;
+		bt_connect = 1;
+
+		return; 
+	}
+
+	//bt_enter_atmode();
+	
+	  //digitalWrite(BT_RESET_PIN, LOW);
+	 //delay(100);
+	//digitalWrite(BT_RESET_PIN, HIGH);
+
+	 blueToothSerial.print("\r\n+STWMOD=0\r\n"); //set the bluetooth work in slave mode
+	 blueToothSerial.print("\r\n+STNA=BikeComputer\r\n"); //set the bluetooth name as "SeeedBTSlave"
+	 //blueToothSerial.print("\r\n+STPIN=0000\r\n");//Set SLAVE pincode"0000"
+	 blueToothSerial.print("\r\n+STOAUT=1\r\n"); // Permit Paired device to connect me
+	 blueToothSerial.print("\r\n+STAUTO=0\r\n"); // Auto-connection should be forbidden here
+	 delay(2000); // This delay is required.
+	 blueToothSerial.print("\r\n+INQ=1\r\n"); //make the slave bluetooth inquirable 
+	 Serial.println("The slave bluetooth is inquirable!");
+	 delay(2000); // This delay is required.
+	 blueToothSerial.flush();
+
+}
 
 void setup_softwareserial()
 {
 	pinMode(RxD, INPUT);
 	pinMode(TxD, OUTPUT);
+	//bt_setup();
 	bt_setup();
 }
 
@@ -465,8 +564,7 @@ void setup() {
 	config_get();
 	config_cmd();
 
-	blueToothSerial.begin(38400); //Set BluetoothBee BaudRate to default baud rate 38400
-	delay(1000);
+	//delay(1000);
 	setup_softwareserial();
 
 	//Serial.println("DHT Begin");
@@ -480,7 +578,45 @@ void loop() {
 	//send_sensors();
 	//blueToothSerial.println("Test");
 	bt_msg_status = digitalRead(BT_STATUS_PIN);
-	get_command(blueToothSerial, Serial, bt_msg_status ? DELIM_NORMAL : DELIM_BTAT );
+
+	/*
+	char recvChar;
+
+	if(blueToothSerial.available()) {//check if there's any data sent from the remote bluetooth shield
+		recvChar = blueToothSerial.read();
+		Serial.print(recvChar);
+	}
+	if(Serial.available()) {//check if there's any data sent from the local serial terminal, you can add the other applications here
+		recvChar = Serial.read();
+		blueToothSerial.print(recvChar);
+	}
+	*/
+
+	/*
+	if ( bt_msg_status == false && has_sent_greeting )
+	{
+		Serial.println("Resetting has_sent");
+		has_sent_greeting = false;
+	}
+	*/
+	if ( !has_sent_greeting )
+	{
+		if ( bt_state == 4 && bt_connect == 1)
+		{
+			delay(2000);
+			Serial.println("BT Connected. Sending greeting");
+			send_config(blueToothSerial);
+			has_sent_greeting = true;
+			blueToothSerial.flush();
+		}
+
+	}
+
+	// get_command(blueToothSerial, Serial, (has_sent_greeting && bt_msg_status == 1) ? DELIM_NORMAL : DELIM_BTAT );
+	get_command(blueToothSerial, Serial, DELIM_BTAT );
+
+
+	
 }
 
 
