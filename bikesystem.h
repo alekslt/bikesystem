@@ -3,6 +3,10 @@
 
 #include "Arduino.h"
 
+// Defines
+#define MAX_STRING_LEN  128
+#define DEBUG_ENABLED  0
+
 // Forwards
 class Stream;
 class SoftwareSerial;

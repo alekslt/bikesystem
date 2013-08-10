@@ -8,12 +8,107 @@
 #include <SoftwareSerial.h>
 #include <string.h>
 
+char cmd_buf[128];
+uint8_t cmd_pos = 0;
+
 uint8_t bt_msg_status = 0;
 uint8_t bt_initstate = 0;
 uint8_t bt_ok = 0;
 uint8_t bt_work = 0;
 uint8_t bt_state = 1;
 uint8_t bt_connect = 0;
+
+// Command Parser
+void parse_command(char command[], Stream &serout, const char delim[])
+{
+	if ( DEBUG_ENABLED )
+	{
+		serout.print("\nParsing command: ");
+		serout.println(command);
+	}
+
+	char *ptr;
+	char *sub = get_token(command, &ptr, delim);
+	for (int i = 0; i < command_amount; i++)
+	{
+		int ret = strcmp(commands[i]->cmd, sub);
+
+		if ( ret == 0 )
+		{
+			if (commands[i]->sendBT == true)
+			{
+				commands[i]->fn(i, ptr, blueToothSerial);
+			} else {
+				commands[i]->fn(i, ptr, serout);
+			}
+			return;
+		}
+	}
+	serout.print("\nCommand not found: ");
+	serout.println(command);
+}
+
+void get_command(Stream &ser, Stream &serout, const char delim[])
+{
+	//serout.print("get_command: is_available=");
+	//serout.println(ser.available());
+	//delay(500);
+	// wait for character to arrive
+	if ( ser.available() )
+	{
+		if ( cmd_pos == 0 )
+		{
+			bt_msg_status = digitalRead(BT_STATUS_PIN);
+		}
+
+		char c = ser.read();
+
+		if ( bt_msg_status == 1 && bt_state == 4 && bt_connect == 1)
+		{
+			//ser.write(c);
+		}
+
+		if ( c == '\n' ) {
+			//serout.println("End of Line");
+			return;
+		}
+
+		if ( DEBUG_ENABLED )
+		{
+			serout.print(c);
+			serout.print("[");
+			serout.print((uint8_t)c);
+			serout.print("]");
+		}
+
+		if ( (uint8_t)c < CMD_ASCII_START || (uint8_t)c > CMD_ASCII_END ) { 
+			return; 
+		}
+		cmd_buf[cmd_pos++] = c;
+
+		if (c == '\r') // is it the terminator byte?
+		{
+			cmd_buf[--cmd_pos] = 0;
+
+			if ( cmd_pos > 1 )
+			{
+
+				//serout.print("\nCommand: (");
+				//serout.print(cmd_pos);
+				//serout.print(")"); 
+				//serout.print(cmd_buf);
+				//serout.print(" BTstate: "); 
+				//serout.println(bt_msg_status ? "Active" : "Disconnected");
+				parse_command(cmd_buf, serout, delim);
+			}
+			cmd_pos = 0;
+			//blueToothSerial.println(cmd_buf);
+			//You can write you BT communication logic here
+		}
+	}
+	//  buf[i] = 0; // 0 string terminator just in case
+}
+
 
 // Bluetooth commands
 void cmd_bt_ok(uint8_t id, char* args, Stream &ser)

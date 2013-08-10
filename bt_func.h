@@ -27,6 +27,7 @@ extern uint8_t bt_work;
 extern uint8_t bt_state;
 extern uint8_t bt_connect;
 
+void get_command(Stream &ser, Stream &serout, const char delim[]);
 
 void cmd_bt_ok(uint8_t id, char* args, Stream &ser);
 void cmd_bt_state(uint8_t id, char* args, Stream &ser);

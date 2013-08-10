@@ -9,9 +9,7 @@
 #include "bt_func.h"
 
 // Defines
-#define MAX_STRING_LEN  128
 #define DHTPIN 2     // what pin we're connected to
-#define DEBUG_ENABLED  0
 
 // Attributes
 DHT dht(DHTPIN, DHT11);
@@ -23,10 +21,6 @@ uint8_t sensor_amount = 0;
 
 struct Command *commands[10];
 uint8_t command_amount = 0;
-
-char cmd_buf[128];
-uint8_t cmd_pos = 0;
-
 
 const char DELIM_NORMAL[] = " ";
 const char DELIM_BTAT[] = ":=";
@@ -130,35 +124,6 @@ char* get_token(char in_string[], char **ptr, const char delim[])
 	return sub; 
 }
 
-void parse_command(char command[], Stream &serout, const char delim[])
-{
-	if ( DEBUG_ENABLED )
-	{
-		serout.print("\nParsing command: ");
-		serout.println(command);
-	}
-
-	char *ptr;
-	char *sub = get_token(command, &ptr, delim);
-	for (int i = 0; i < command_amount; i++)
-	{
-		int ret = strcmp(commands[i]->cmd, sub);
-
-		if ( ret == 0 )
-		{
-			if (commands[i]->sendBT == true)
-			{
-				commands[i]->fn(i, ptr, blueToothSerial);
-			} else {
-				commands[i]->fn(i, ptr, serout);
-			}
-			return;
-		}
-	}
-	serout.print("\nCommand not found: ");
-	serout.println(command);
-}
-
 // General commands setup
 void cmd_send_config(uint8_t id, char* args, Stream &ser)
 {
@@ -173,67 +138,6 @@ void cmd_send_sensors(uint8_t id, char* args, Stream &ser)
 void cmd_general(uint8_t id, char* args, Stream &ser)
 {
 	commands[id]->print_info(args, ser);
-}
-
-void get_command(Stream &ser, Stream &serout, const char delim[])
-{
-	//serout.print("get_command: is_available=");
-	//serout.println(ser.available());
-	//delay(500);
-	// wait for character to arrive
-	if ( ser.available() )
-	{
-		if ( cmd_pos == 0 )
-		{
-			bt_msg_status = digitalRead(BT_STATUS_PIN);
-		}
-
-		char c = ser.read();
-
-		if ( bt_msg_status == 1 && bt_state == 4 && bt_connect == 1)
-		{
-			//ser.write(c);
-		}
-
-		if ( c == '\n' ) {
-			//serout.println("End of Line");
-			return;
-		}
-
-		if ( DEBUG_ENABLED )
-		{
-			serout.print(c);
-			serout.print("[");
-			serout.print((uint8_t)c);
-			serout.print("]");
-		}
-
-		if ( (uint8_t)c < CMD_ASCII_START || (uint8_t)c > CMD_ASCII_END ) { 
-			return; 
-		}
-		cmd_buf[cmd_pos++] = c;
-
-		if (c == '\r') // is it the terminator byte?
-		{
-			cmd_buf[--cmd_pos] = 0;
-
-			if ( cmd_pos > 1 )
-			{
-
-				//serout.print("\nCommand: (");
-				//serout.print(cmd_pos);
-				//serout.print(")"); 
-				//serout.print(cmd_buf);
-				//serout.print(" BTstate: "); 
-				//serout.println(bt_msg_status ? "Active" : "Disconnected");
-				parse_command(cmd_buf, serout, delim);
-			}
-			cmd_pos = 0;
-			//blueToothSerial.println(cmd_buf);
-			//You can write you BT communication logic here
-		}
-	}
-	//  buf[i] = 0; // 0 string terminator just in case
 }
 
 
@@ -266,23 +170,18 @@ void setup_softwareserial()
 }
 
 void setup() {
-	//config_get();
 	Serial.begin(38400); 
 	Serial.println("Bike Computer Setup");
 
-	//Serial.println("config_get");
 	config_get();
 	config_cmd();
 
-	//delay(1000);
 	setup_softwareserial();
 
 	bt_setup();
 
-	//Serial.println("DHT Begin");
 	dht.begin();
 
-	//Serial.println("Send Config");
 	send_config(Serial);
 } 
 
