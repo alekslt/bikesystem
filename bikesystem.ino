@@ -70,6 +70,21 @@ void DHT_get_humidity(uint8_t id, Stream &ser)
 	}  
 }
 
+void BIKE_get_heart_rate(uint8_t id, Stream &ser)
+{
+	ser.println("86");
+}
+
+void BIKE_get_velocity(uint8_t id, Stream &ser)
+{
+	ser.println("21");
+}
+
+void BIKE_get_distance(uint8_t id, Stream &ser)
+{
+	ser.println("1424");
+}
+
 // Command Interpreter
 void config_get()
 {
@@ -77,6 +92,15 @@ void config_get()
 	sensor_amount++;
 
 	sensors[sensor_amount] = new Serial_info("DHT_T", "DHT Temp", DHT_get_temp);
+	sensor_amount++;
+
+	sensors[sensor_amount] = new Serial_info("BK_H", "BIKE Heartrate", BIKE_get_heart_rate);
+	sensor_amount++;
+
+	sensors[sensor_amount] = new Serial_info("BK_V", "BIKE Velocity", BIKE_get_velocity);
+	sensor_amount++;
+
+	sensors[sensor_amount] = new Serial_info("BK_D", "BIKE Distance", BIKE_get_distance);
 	sensor_amount++;
 }
 
@@ -203,7 +227,7 @@ void loop() {
 
 	// get_command(blueToothSerial, Serial, (has_sent_greeting && bt_msg_status == 1) ? DELIM_NORMAL : DELIM_BTAT );
 	get_command(blueToothSerial, Serial, DELIM_BTAT );
-	
+	get_command(Serial, blueToothSerial, DELIM_BTAT );
 }
 
 
